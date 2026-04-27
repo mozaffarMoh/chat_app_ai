@@ -16,7 +16,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api/v1');
 
   app.enableCors({
-    origin: process.env['CORS_ORIGIN'] ?? 'http://localhost:5173',
+    origin: true,
     credentials: true,
   });
 

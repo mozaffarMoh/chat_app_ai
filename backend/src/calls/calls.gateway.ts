@@ -35,7 +35,7 @@ const userSocketMap = new Map<string, string>();
 
 @WebSocketGateway({
   namespace: '/calls',
-  cors: { origin: process.env['CORS_ORIGIN'], credentials: true },
+  cors: { origin: true, credentials: true },
 })
 export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

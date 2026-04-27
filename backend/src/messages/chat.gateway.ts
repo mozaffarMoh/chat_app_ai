@@ -53,7 +53,7 @@ class RateLimiter {
 
 @WebSocketGateway({
   namespace: '/chat',
-  cors: { origin: process.env['CORS_ORIGIN'], credentials: true },
+  cors: { origin: true, credentials: true },
 })
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()

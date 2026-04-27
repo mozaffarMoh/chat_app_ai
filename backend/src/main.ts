@@ -40,7 +40,10 @@ async function bootstrap(): Promise<void> {
     void (async () => {
       try {
         const ctx = {
-          switchToHttp: () => ({ getRequest: () => req, getResponse: () => res }),
+          switchToHttp: () => ({
+            getRequest: () => req,
+            getResponse: () => res,
+          }),
           getType: () => 'http',
           getArgs: () => [req, res, next],
           getArgByIndex: (_i: number) => req,

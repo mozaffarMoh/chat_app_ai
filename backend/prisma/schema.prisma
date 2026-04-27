@@ -1,0 +1,183 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum PresenceStatus {
+  ONLINE
+  OFFLINE
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum BoardStatus {
+  ACTIVE
+  AWAITING_REPLY
+  RESOLVED
+}
+
+enum MessageType {
+  TEXT
+  VOICE
+}
+
+enum ReadStatus {
+  DELIVERED
+  READ
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}
+
+enum CallStatus {
+  RINGING
+  ACTIVE
+  ENDED
+  DECLINED
+  MISSED
+  FAILED
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id              String         @id @default(cuid())
+  email           String         @unique
+  passwordHash    String
+  displayName     String
+  avatarUrl       String?
+  presenceStatus  PresenceStatus @default(OFFLINE)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  refreshTokenSessions RefreshTokenSession[]
+  conversationParticipants ConversationParticipant[]
+  sentMessages     Message[]           @relation("SentMessages")
+  messageReadStatuses MessageReadStatus[]
+  initiatedCalls   CallSession[]       @relation("InitiatedCalls")
+  receivedCalls    CallSession[]       @relation("ReceivedCalls")
+}
+
+model RefreshTokenSession {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  isValid   Boolean  @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId])
+}
+
+model Conversation {
+  id              String           @id @default(cuid())
+  type            ConversationType
+  name            String?
+  boardStatus     BoardStatus      @default(ACTIVE)
+  lastActivityAt  DateTime         @default(now())
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  callSessions CallSession[]
+
+  @@index([lastActivityAt])
+}
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  userId         String
+  conversationId String
+  joinedAt       DateTime @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, conversationId])
+  @@index([conversationId])
+}
+
+model Message {
+  id               String      @id @default(cuid())
+  conversationId   String
+  senderId         String
+  type             MessageType
+  body             String?
+  voiceRecordingId String?     @unique
+  sentAt           DateTime    @default(now())
+  deletedAt        DateTime?
+
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User              @relation("SentMessages", fields: [senderId], references: [id])
+  voiceRecording VoiceRecording?   @relation(fields: [voiceRecordingId], references: [id])
+  readStatuses   MessageReadStatus[]
+
+  @@index([conversationId, sentAt])
+  @@index([senderId])
+}
+
+model MessageReadStatus {
+  id        String     @id @default(cuid())
+  messageId String
+  userId    String
+  status    ReadStatus @default(DELIVERED)
+  readAt    DateTime?
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+}
+
+model VoiceRecording {
+  id              String   @id @default(cuid())
+  filePath        String
+  mimeType        String
+  durationSeconds Int
+  sizeBytes       Int
+  createdAt       DateTime @default(now())
+
+  message Message?
+}
+
+model CallSession {
+  id              String     @id @default(cuid())
+  conversationId  String
+  initiatorId     String
+  recipientId     String
+  type            CallType
+  status          CallStatus
+  startedAt       DateTime?
+  endedAt         DateTime?
+  durationSeconds Int?
+  createdAt       DateTime   @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiator    User         @relation("InitiatedCalls", fields: [initiatorId], references: [id])
+  recipient    User         @relation("ReceivedCalls", fields: [recipientId], references: [id])
+
+  @@index([conversationId])
+  @@index([initiatorId])
+  @@index([recipientId])
+  @@index([status])
+}
+

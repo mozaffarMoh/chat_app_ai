@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 import api from '../../shared/services/api'
 import type { User } from '../../shared/types'
 
@@ -16,6 +16,7 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const isRefreshingRef = useRef(false)
 
   const fetchMe = useCallback(async () => {
     try {
@@ -34,11 +35,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const handler = () => {
-      void refreshToken()
+      if (isRefreshingRef.current) return
+      isRefreshingRef.current = true
+      void refreshToken().finally(() => {
+        isRefreshingRef.current = false
+      })
     }
     window.addEventListener('auth:unauthorized', handler)
     return () => window.removeEventListener('auth:unauthorized', handler)
-  })
+  }, [])
 
   const login = async (email: string, password: string): Promise<void> => {
     await api.post('/auth/login', { email, password })

@@ -7,7 +7,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
-import { IsEnum } from 'class-validator';
+import { IsEnum, IsString } from 'class-validator';
 import { CallsService } from './calls.service.js';
 import { JwtGuard } from '../common/guards/jwt.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
@@ -17,6 +17,7 @@ import { CallStatus, CallType } from '../../generated/prisma/index.js';
 class InitiateCallDto {
   @IsEnum(CallType)
   type!: CallType;
+  @IsString()
   recipientId!: string;
 }
 

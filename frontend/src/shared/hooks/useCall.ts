@@ -81,12 +81,12 @@ export function useCall(): UseCallReturn {
       setCallState('ringing_outgoing')
       remoteUserIdRef.current = recipientId
 
-      const { data } = await axios.post<{ data: { id: string } }>(
+      const { data } = await axios.post<{ id: string }>(
         `${API_BASE}/conversations/${conversationId}/calls`,
         { recipientId, type },
         { withCredentials: true },
       )
-      const callId = data.data.id
+      const callId = data.id
       callIdRef.current = callId
 
       const { callsSocket } = getSocketInstances()

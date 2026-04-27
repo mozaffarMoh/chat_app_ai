@@ -86,21 +86,13 @@ export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: InitiateCallPayload,
   ): void {
     const initiatorId = socket.data.userId;
-    // Check if recipient is busy
-    void this.callsService
-      .getUserActiveCallSession(data.recipientId)
-      .then((session) => {
-        if (session) {
-          socket.emit('call:busy', { recipientId: data.recipientId });
-          return;
-        }
-        this.server.to(`user:${data.recipientId}`).emit('call:incoming', {
-          callId: data.callId,
-          initiatorId,
-          callType: data.callType,
-          conversationId: data.conversationId,
-        });
-      });
+    // REST endpoint already verified recipient availability; just forward the notification
+    this.server.to(`user:${data.recipientId}`).emit('call:incoming', {
+      callId: data.callId,
+      initiatorId,
+      callType: data.callType,
+      conversationId: data.conversationId,
+    });
   }
 
   @SubscribeMessage('call:accepted')

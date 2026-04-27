@@ -28,6 +28,15 @@ export class CallsService {
     recipientId: string,
     type: CallType,
   ): Promise<CallSession> {
+    // Clean up any stale sessions for the initiator (e.g. from a previous call that wasn't ended)
+    await this.prisma.callSession.updateMany({
+      where: {
+        status: { in: ['RINGING', 'ACTIVE'] },
+        OR: [{ initiatorId }, { recipientId: initiatorId }],
+      },
+      data: { status: 'ENDED', endedAt: new Date() },
+    });
+
     // Check recipient not in active call
     const recipientBusy = await this.prisma.callSession.findFirst({
       where: {

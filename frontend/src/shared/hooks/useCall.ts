@@ -108,12 +108,12 @@ export function useCall(): UseCallReturn {
     const { callsSocket: cs } = getSocketInstances()
     cs?.emit('call:accepted', { callId, initiatorId })
     setCallState('connecting')
+    setCallType(type)
 
     void getMedia(type)
       .then((stream) => {
         localStreamRef.current = stream
         setLocalStream(stream)
-        setCallType(type)
 
         const peer = new SimplePeer({
           initiator: false,

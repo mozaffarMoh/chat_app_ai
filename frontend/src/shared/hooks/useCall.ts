@@ -48,15 +48,17 @@ export function useCall(): UseCallReturn {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
   const callIdRef = useRef<string | null>(null)
   const remoteUserIdRef = useRef<string | null>(null)
+  const localStreamRef = useRef<MediaStream | null>(null)
 
   const cleanup = useCallback(() => {
     if (peerRef.current) {
       peerRef.current.destroy()
       peerRef.current = null
     }
-    if (localStream) {
-      localStream.getTracks().forEach((t) => t.stop())
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop())
     }
+    localStreamRef.current = null
     setLocalStream(null)
     setRemoteStream(null)
     setCallState('idle')
@@ -64,7 +66,7 @@ export function useCall(): UseCallReturn {
     setIncomingCallInfo(null)
     callIdRef.current = null
     remoteUserIdRef.current = null
-  }, [localStream])
+  }, [])
 
   const getMedia = useCallback(async (type: CallType) => {
     return navigator.mediaDevices.getUserMedia({
@@ -76,6 +78,7 @@ export function useCall(): UseCallReturn {
   const initiateCall = useCallback(
     async (conversationId: string, recipientId: string, type: CallType) => {
       const stream = await getMedia(type)
+      localStreamRef.current = stream
       setLocalStream(stream)
       setCallType(type)
       setCallState('ringing_outgoing')
@@ -102,6 +105,7 @@ export function useCall(): UseCallReturn {
     remoteUserIdRef.current = initiatorId
 
     void getMedia(type).then((stream) => {
+      localStreamRef.current = stream
       setLocalStream(stream)
       setCallType(type)
       setCallState('connecting')
@@ -165,30 +169,29 @@ export function useCall(): UseCallReturn {
 
     const onAccepted = (data: { callId: string; acceptorId: string }) => {
       remoteUserIdRef.current = data.acceptorId
-      void getMedia(callType ?? 'AUDIO').then((stream) => {
-        setLocalStream(stream)
-        setCallState('connecting')
+      const stream = localStreamRef.current
+      if (!stream) return
+      setCallState('connecting')
 
-        const peer = new SimplePeer({
-          initiator: true,
-          trickle: false,
-          stream,
-          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-        })
-        peerRef.current = peer
+      const peer = new SimplePeer({
+        initiator: true,
+        trickle: false,
+        stream,
+        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+      })
+      peerRef.current = peer
 
-        peer.on('signal', (signal) => {
-          callsSocket.emit('call:signal', {
-            callId: callIdRef.current,
-            recipientUserId: data.acceptorId,
-            signal,
-          })
+      peer.on('signal', (signal) => {
+        callsSocket.emit('call:signal', {
+          callId: callIdRef.current,
+          recipientUserId: data.acceptorId,
+          signal,
         })
+      })
 
-        peer.on('stream', (remoteStr) => {
-          setRemoteStream(remoteStr)
-          setCallState('active')
-        })
+      peer.on('stream', (remoteStr) => {
+        setRemoteStream(remoteStr)
+        setCallState('active')
       })
     }
 
@@ -217,7 +220,7 @@ export function useCall(): UseCallReturn {
       callsSocket.off('call:ended', onEnded)
       callsSocket.off('call:busy', onBusy)
     }
-  }, [callType, cleanup, getMedia])
+  }, [cleanup])
 
   // Attach local stream to local video
   useEffect(() => {

@@ -10,6 +10,7 @@ import IncomingCallModal from '../calls/IncomingCallModal'
 import OutgoingCallOverlay from '../calls/OutgoingCallOverlay'
 import CallView from '../calls/CallView'
 import { useCall } from '../../shared/hooks/useCall'
+import { useSocket } from '../../shared/hooks/useSocket'
 import { useAuth } from '../auth/AuthContext'
 import type { Conversation } from '../../shared/types'
 
@@ -20,6 +21,7 @@ type ViewMode = 'list' | 'board'
 
 export function WorkspaceLayout() {
   const { user } = useAuth()
+  useSocket(!!user)
   const call = useCall()
   const screens = Grid.useBreakpoint()
   const isMobile = !screens.md

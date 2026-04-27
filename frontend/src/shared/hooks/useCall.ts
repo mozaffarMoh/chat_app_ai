@@ -84,12 +84,12 @@ export function useCall(): UseCallReturn {
       setCallState('ringing_outgoing')
       remoteUserIdRef.current = recipientId
 
-      const { data } = await axios.post<{ id: string }>(
+      const { data } = await axios.post<{ data: { id: string } }>(
         `${API_BASE}/conversations/${conversationId}/calls`,
         { recipientId, type },
         { withCredentials: true },
       )
-      const callId = data.id
+      const callId = data.data.id
       callIdRef.current = callId
 
       const { callsSocket } = getSocketInstances()
@@ -104,37 +104,42 @@ export function useCall(): UseCallReturn {
     callIdRef.current = callId
     remoteUserIdRef.current = initiatorId
 
-    void getMedia(type).then((stream) => {
-      localStreamRef.current = stream
-      setLocalStream(stream)
-      setCallType(type)
-      setCallState('connecting')
+    // Emit accepted immediately so caller is notified without waiting for getUserMedia
+    const { callsSocket: cs } = getSocketInstances()
+    cs?.emit('call:accepted', { callId, initiatorId })
+    setCallState('connecting')
 
-      const peer = new SimplePeer({
-        initiator: false,
-        trickle: false,
-        stream,
-        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-      })
-      peerRef.current = peer
+    void getMedia(type)
+      .then((stream) => {
+        localStreamRef.current = stream
+        setLocalStream(stream)
+        setCallType(type)
 
-      peer.on('signal', (signal) => {
-        const { callsSocket } = getSocketInstances()
-        callsSocket?.emit('call:signal', {
-          callId,
-          recipientUserId: remoteUserIdRef.current,
-          signal,
+        const peer = new SimplePeer({
+          initiator: false,
+          trickle: false,
+          stream,
+          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+        })
+        peerRef.current = peer
+
+        peer.on('signal', (signal) => {
+          const { callsSocket } = getSocketInstances()
+          callsSocket?.emit('call:signal', {
+            callId,
+            recipientUserId: remoteUserIdRef.current,
+            signal,
+          })
+        })
+
+        peer.on('stream', (remoteStr) => {
+          setRemoteStream(remoteStr)
+          setCallState('active')
         })
       })
-
-      peer.on('stream', (remoteStr) => {
-        setRemoteStream(remoteStr)
-        setCallState('active')
+      .catch(() => {
+        cleanup()
       })
-
-      const { callsSocket } = getSocketInstances()
-      callsSocket?.emit('call:accepted', { callId, initiatorId })
-    })
   }, [incomingCallInfo, getMedia])
 
   const declineCall = useCallback(() => {

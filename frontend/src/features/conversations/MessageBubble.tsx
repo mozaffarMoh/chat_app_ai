@@ -1,7 +1,9 @@
 import { Typography } from 'antd'
 import type { Message, User } from '../../shared/types'
 import { VoiceMessagePlayer } from '../chat/VoiceMessagePlayer'
+
 const { Text } = Typography
+const BACKEND_URL = (import.meta.env.VITE_SOCKET_URL as string | undefined) ?? ''
 
 interface MessageBubbleProps {
   message: Message
@@ -41,7 +43,7 @@ export function MessageBubble({ message, currentUser, onDelete }: MessageBubbleP
             <em>Message deleted</em>
           ) : message.type === 'VOICE' && message.voiceRecording ? (
             <VoiceMessagePlayer
-              src={message.voiceRecording.filePath}
+              src={`${BACKEND_URL}${message.voiceRecording.filePath}`}
               durationSeconds={message.voiceRecording.durationSeconds}
             />
           ) : (

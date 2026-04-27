@@ -75,7 +75,11 @@ export function ChatView({ conversationId, conversationTitle, currentUser, recip
     chatSocket.emit('chat:join', { conversationId })
 
     const onNewMessage = (msg: Message) => {
-      setMessages((prev) => [...prev, msg])
+      setMessages((prev) => {
+        // Deduplicate: voice messages are also added via onRecorded REST response
+        if (prev.some((m) => m.id === msg.id)) return prev
+        return [...prev, msg]
+      })
       // mark read
       chatSocket.emit('chat:message:read', { conversationId, upToMessageId: msg.id })
     }

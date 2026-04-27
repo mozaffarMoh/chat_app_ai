@@ -48,7 +48,6 @@ export function useCall(): UseCallReturn {
   const remoteVideoRef = useRef<HTMLVideoElement | null>(null)
   const callIdRef = useRef<string | null>(null)
   const remoteUserIdRef = useRef<string | null>(null)
-  const remoteSocketIdRef = useRef<string | null>(null)
 
   const cleanup = useCallback(() => {
     if (peerRef.current) {
@@ -65,7 +64,6 @@ export function useCall(): UseCallReturn {
     setIncomingCallInfo(null)
     callIdRef.current = null
     remoteUserIdRef.current = null
-    remoteSocketIdRef.current = null
   }, [localStream])
 
   const getMedia = useCallback(async (type: CallType) => {
@@ -118,13 +116,11 @@ export function useCall(): UseCallReturn {
 
       peer.on('signal', (signal) => {
         const { callsSocket } = getSocketInstances()
-        if (remoteSocketIdRef.current) {
-          callsSocket?.emit('call:signal', {
-            callId,
-            recipientSocketId: remoteSocketIdRef.current,
-            signal,
-          })
-        }
+        callsSocket?.emit('call:signal', {
+          callId,
+          recipientUserId: remoteUserIdRef.current,
+          signal,
+        })
       })
 
       peer.on('stream', (remoteStr) => {
@@ -167,8 +163,8 @@ export function useCall(): UseCallReturn {
       setCallState('ringing_incoming')
     }
 
-    const onAccepted = (data: { callId: string; acceptorId: string; acceptorSocketId: string }) => {
-      remoteSocketIdRef.current = data.acceptorSocketId
+    const onAccepted = (data: { callId: string; acceptorId: string }) => {
+      remoteUserIdRef.current = data.acceptorId
       void getMedia(callType ?? 'AUDIO').then((stream) => {
         setLocalStream(stream)
         setCallState('connecting')
@@ -184,7 +180,7 @@ export function useCall(): UseCallReturn {
         peer.on('signal', (signal) => {
           callsSocket.emit('call:signal', {
             callId: callIdRef.current,
-            recipientSocketId: data.acceptorSocketId,
+            recipientUserId: data.acceptorId,
             signal,
           })
         })

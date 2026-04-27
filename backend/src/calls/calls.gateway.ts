@@ -22,7 +22,7 @@ interface InitiateCallPayload {
 
 interface SignalPayload {
   callId: string;
-  recipientSocketId: string;
+  recipientUserId: string;
   signal: unknown;
 }
 
@@ -153,8 +153,8 @@ export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('call:signal')
   handleSignal(@MessageBody() data: SignalPayload): void {
-    // Relay WebRTC signal to the specific socket
-    this.server.to(data.recipientSocketId).emit('call:signal', {
+    // Relay WebRTC signal via the recipient's user room (avoids needing socket IDs on clients)
+    this.server.to(`user:${data.recipientUserId}`).emit('call:signal', {
       callId: data.callId,
       signal: data.signal,
     });

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
-import api from '../../shared/services/api'
+import api, { updateAuthState } from '../../shared/services/api'
 import type { User } from '../../shared/types'
 
 interface AuthContextValue {
@@ -22,8 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const res = await api.get<{ data: User }>('/users/me')
       setUser(res.data.data)
+      updateAuthState(true)
     } catch {
       setUser(null)
+      updateAuthState(false)
     } finally {
       setIsLoading(false)
     }
@@ -56,6 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async (): Promise<void> => {
+    updateAuthState(false)
     try {
       await api.post('/auth/logout')
     } finally {
@@ -69,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await fetchMe()
     } catch {
       setUser(null)
+      updateAuthState(false)
     }
   }
 

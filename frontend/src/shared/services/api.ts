@@ -5,15 +5,21 @@ const api = axios.create({
   withCredentials: true,
 })
 
-// Emit a custom event on 401 so AuthContext can trigger a token refresh
-// Skip /auth/refresh and /auth/login to avoid infinite loops
+// Only fire auth:unauthorized when the user is known to be authenticated.
+// This prevents a stale refresh triggered by the initial /users/me probe
+// from wiping a freshly-logged-in user.
+let _isAuthenticated = false
+export const updateAuthState = (authenticated: boolean) => {
+  _isAuthenticated = authenticated
+}
+
 api.interceptors.response.use(
   (response) => response,
   (error: unknown) => {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
       const url = error.config?.url ?? ''
       const isAuthEndpoint = url.includes('/auth/refresh') || url.includes('/auth/login')
-      if (!isAuthEndpoint) {
+      if (!isAuthEndpoint && _isAuthenticated) {
         window.dispatchEvent(new CustomEvent('auth:unauthorized'))
       }
     }

@@ -101,15 +101,14 @@ export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: { callId: string; initiatorId: string },
   ): void {
     const acceptorId = socket.data.userId;
+    // Emit to caller immediately — signaling must not block on DB
+    this.server.to(`user:${data.initiatorId}`).emit('call:accepted', {
+      callId: data.callId,
+      acceptorId,
+    });
+    // Update DB status in the background (non-blocking)
     void this.callsService
       .updateStatus(data.callId, acceptorId, 'ACTIVE')
-      .then(() => {
-        this.server.to(`user:${data.initiatorId}`).emit('call:accepted', {
-          callId: data.callId,
-          acceptorId,
-          acceptorSocketId: socket.id,
-        });
-      })
       .catch(() => {});
   }
 
@@ -118,13 +117,11 @@ export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() data: { callId: string; initiatorId: string },
   ): void {
+    this.server
+      .to(`user:${data.initiatorId}`)
+      .emit('call:declined', { callId: data.callId });
     void this.callsService
       .updateStatus(data.callId, socket.data.userId, 'DECLINED')
-      .then(() => {
-        this.server
-          .to(`user:${data.initiatorId}`)
-          .emit('call:declined', { callId: data.callId });
-      })
       .catch(() => {});
   }
 
@@ -133,13 +130,11 @@ export class CallsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @ConnectedSocket() socket: AuthSocket,
     @MessageBody() data: CallActionPayload & { recipientId: string },
   ): void {
+    this.server
+      .to(`user:${data.recipientId}`)
+      .emit('call:ended', { callId: data.callId });
     void this.callsService
       .updateStatus(data.callId, socket.data.userId, 'ENDED')
-      .then(() => {
-        this.server
-          .to(`user:${data.recipientId}`)
-          .emit('call:ended', { callId: data.callId });
-      })
       .catch(() => {});
   }
 

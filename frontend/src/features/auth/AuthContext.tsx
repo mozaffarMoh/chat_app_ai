@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+import axios from 'axios'
 import api, { updateAuthState } from '../../shared/services/api'
 import type { User } from '../../shared/types'
 
@@ -70,9 +71,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       await api.post('/auth/refresh')
       await fetchMe()
-    } catch {
-      setUser(null)
-      updateAuthState(false)
+    } catch (err) {
+      // Only log out on 401 (token invalid/expired). Ignore 500 / network errors
+      // to avoid kicking the user out due to a transient server issue.
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setUser(null)
+        updateAuthState(false)
+      }
     }
   }
 

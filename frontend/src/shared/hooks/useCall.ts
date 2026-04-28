@@ -49,6 +49,8 @@ export function useCall(): UseCallReturn {
   const callIdRef = useRef<string | null>(null)
   const remoteUserIdRef = useRef<string | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
+  // Buffer signals that arrive before the peer is ready (race condition fix)
+  const signalQueueRef = useRef<SimplePeer.SignalData[]>([])
 
   const cleanup = useCallback(() => {
     if (peerRef.current) {
@@ -59,6 +61,7 @@ export function useCall(): UseCallReturn {
       localStreamRef.current.getTracks().forEach((t) => t.stop())
     }
     localStreamRef.current = null
+    signalQueueRef.current = []
     setLocalStream(null)
     setRemoteStream(null)
     setCallState('idle')
@@ -115,13 +118,23 @@ export function useCall(): UseCallReturn {
         localStreamRef.current = stream
         setLocalStream(stream)
 
-        const peer = new SimplePeer({
-          initiator: false,
-          trickle: false,
-          stream,
-          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-        })
+        let peer: SimplePeer.Instance
+        try {
+          peer = new SimplePeer({
+            initiator: false,
+            trickle: false,
+            stream,
+            config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+          })
+        } catch {
+          cleanup()
+          return
+        }
         peerRef.current = peer
+
+        // Drain any signals buffered while peer was being set up
+        const queued = signalQueueRef.current.splice(0)
+        queued.forEach((s) => peer.signal(s))
 
         peer.on('signal', (signal) => {
           const { callsSocket } = getSocketInstances()
@@ -136,11 +149,19 @@ export function useCall(): UseCallReturn {
           setRemoteStream(remoteStr)
           setCallState('active')
         })
+
+        peer.on('error', () => {
+          cleanup()
+        })
+
+        peer.on('close', () => {
+          cleanup()
+        })
       })
       .catch(() => {
         cleanup()
       })
-  }, [incomingCallInfo, getMedia])
+  }, [incomingCallInfo, getMedia, cleanup])
 
   const declineCall = useCallback(() => {
     if (!incomingCallInfo) return
@@ -178,13 +199,23 @@ export function useCall(): UseCallReturn {
       if (!stream) return
       setCallState('connecting')
 
-      const peer = new SimplePeer({
-        initiator: true,
-        trickle: false,
-        stream,
-        config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
-      })
+      let peer: SimplePeer.Instance
+      try {
+        peer = new SimplePeer({
+          initiator: true,
+          trickle: false,
+          stream,
+          config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] },
+        })
+      } catch {
+        cleanup()
+        return
+      }
       peerRef.current = peer
+
+      // Drain any signals buffered while peer was being set up
+      const queued = signalQueueRef.current.splice(0)
+      queued.forEach((s) => peer.signal(s))
 
       peer.on('signal', (signal) => {
         callsSocket.emit('call:signal', {
@@ -198,10 +229,23 @@ export function useCall(): UseCallReturn {
         setRemoteStream(remoteStr)
         setCallState('active')
       })
+
+      peer.on('error', () => {
+        cleanup()
+      })
+
+      peer.on('close', () => {
+        cleanup()
+      })
     }
 
     const onSignal = (data: { callId: string; signal: SimplePeer.SignalData }) => {
-      peerRef.current?.signal(data.signal)
+      if (peerRef.current) {
+        peerRef.current.signal(data.signal)
+      } else {
+        // Peer not ready yet — buffer the signal and apply once peer is created
+        signalQueueRef.current.push(data.signal)
+      }
     }
 
     const onDeclined = () => cleanup()

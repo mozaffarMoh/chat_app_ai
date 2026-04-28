@@ -16,10 +16,12 @@ import { JwtGuard } from '../common/guards/jwt.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../common/guards/jwt.guard.js';
 
+const isProd = process.env['NODE_ENV'] === 'production';
+
 const COOKIE_OPTIONS = {
   httpOnly: true,
-  secure: process.env['NODE_ENV'] === 'production',
-  sameSite: 'strict' as const,
+  secure: isProd,
+  sameSite: (isProd ? 'none' : 'lax') as 'none' | 'lax',
   path: '/',
 };
 

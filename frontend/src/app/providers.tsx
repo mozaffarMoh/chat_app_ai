@@ -23,7 +23,7 @@ export function Providers({ children }: ProvidersProps) {
         theme={{
           algorithm: theme.defaultAlgorithm,
           token: {
-            colorPrimary: '#1677ff',
+            colorPrimary: '#1d58aa',
             borderRadius: 8,
           },
         }}
